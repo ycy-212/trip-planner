@@ -1,0 +1,86 @@
+# GitLab CI/CD配置
+# 基于团队标准配置（参考work1/3/5项目）
+
+variables:
+  # 镜像命名规范
+  CI_REGISTRY_IMAGE_ID: docker-registry.azgpu05.azshentong.com/starzz/az:${CI_PROJECT_TITLE}_${CI_COMMIT_REF_NAME}_${CI_PIPELINE_ID}
+  CI_REGISTRY_IMAGE_vendor: docker-registry.azgpu05.azshentong.com/starzz/az:${CI_PROJECT_TITLE}_vendor
+  CI_REGISTRY_IMAGE_vendor_id: docker-registry.azgpu05.azshentong.com/starzz/az:${CI_PROJECT_TITLE}_vendor_${CI_PIPELINE_ID}
+  
+  # 项目配置
+  PROJECT_NAME: $CI_PROJECT_TITLE
+  GIT_SSL_NO_VERIFY: 'true'
+  BUILDKIT_PROGRESS: plain
+  DEPLOY_SERVER_NAME: azgpu05/$CI_PROJECT_TITLE  # 注意：可能需要修改服务器名称
+  DEPLOY_HTTP_PORT: 7860
+
+# 构建vendor镜像（基础依赖）
+build_vendor_image:
+  image: registry.cn-hangzhou.aliyuncs.com/sync/hub:docker
+  stage: .pre
+  rules:
+    - if: '$CI_COMMIT_TITLE =~ /.*\[vendor\].*/'
+      when: always
+  before_script:
+    - sudo docker login -u "$CI_REGISTRY_USER" -p "$CI_REGISTRY_PASSWORD" $CI_REGISTRY_URL2
+  script:
+    - echo "$CI_REGISTRY_IMAGE_vendor_id"
+    - sudo docker build --pull --build-arg APP_VERSION="${CI_COMMIT_REF_NAME}_${CI_PIPELINE_ID}" --build-arg CI_PROJECT_TITLE="${CI_PROJECT_TITLE}" -t "$CI_REGISTRY_IMAGE_vendor_id" . -f docker/Dockerfile.vendor
+    - sudo docker push "$CI_REGISTRY_IMAGE_vendor_id"
+    - sudo docker tag "$CI_REGISTRY_IMAGE_vendor_id" "$CI_REGISTRY_IMAGE_vendor"
+    - sudo docker push "$CI_REGISTRY_IMAGE_vendor"
+    - echo "$CI_REGISTRY_IMAGE_vendor_id"
+
+# 构建应用镜像
+build_image:
+  image: registry.cn-hangzhou.aliyuncs.com/sync/hub:docker
+  stage: build
+  only:
+    - master
+    - main
+    - qa
+    - qa2
+    - pre
+  before_script:
+    - sudo docker login -u "$CI_REGISTRY_USER" -p "$CI_REGISTRY_PASSWORD" $CI_REGISTRY_URL2
+  script:
+    - echo "$CI_REGISTRY_IMAGE_ID"
+    - echo "$CI_REGISTRY_IMAGE_vendor"
+    - sudo docker pull "$CI_REGISTRY_IMAGE_vendor" || true
+    - sed -i "s/__VERSION__/${CI_COMMIT_REF_NAME}_${CI_PIPELINE_ID}/g" docker/Dockerfile
+    # 构建时传递 DATABASE_URL 和项目名称配置
+    # DATABASE_URL 从 CI/CD Variables 读取（敏感信息，不存储在代码中）
+    - sudo docker build --pull
+        --build-arg APP_VERSION="${CI_COMMIT_REF_NAME}_${CI_PIPELINE_ID}"
+        --build-arg CI_PROJECT_TITLE="${CI_PROJECT_TITLE}"
+        --build-arg DATABASE_URL="${DATABASE_URL}"
+        -t "$CI_REGISTRY_IMAGE_ID" . -f docker/Dockerfile
+    - sudo docker push "$CI_REGISTRY_IMAGE_ID"
+    - echo "$CI_REGISTRY_IMAGE_ID"
+
+# 部署到生产环境（K8s）
+# 前置条件：
+# 1. GitLab项目中的Kubernetes集群配置（需要k8s标签的Runner）
+# 2. namespace 'shentong' 已存在
+# 3. deployment名称已创建（template, qa-template, pre-template）
+deploy_production:
+  image: registry.cn-hangzhou.aliyuncs.com/starzz/cicd:az-argocd
+  stage: deploy
+  tags:
+    - k8s
+  only:
+    - master
+    - main
+    - qa
+    - qa2
+    - pre
+  variables:
+    GIT_STRATEGY: none
+  script:
+    - export PREFIX=''
+    - if [ "$CI_COMMIT_REF_NAME" == "qa" ]; then export PREFIX='qa-' ; fi
+    - if [ "$CI_COMMIT_REF_NAME" == "pre" ]; then export PREFIX='pre-' ; fi
+    - export DEPLOY_NAME=${PREFIX}${PROJECT_NAME}
+    - echo "DEPLOY_NAME=$DEPLOY_NAME"
+    - kubectl set image deploy/$DEPLOY_NAME "$DEPLOY_NAME=${CI_REGISTRY_IMAGE_ID}" --record -n shentong
+

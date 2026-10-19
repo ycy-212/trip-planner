@@ -1,0 +1,40 @@
+# HelloAgents框架
+hello-agents[protocols]>=0.2.4,<=0.2.9
+
+# LangGraph 编排框架
+# 注意: 版本受限于 hello-agents(openai<2.0) 与 langchain-core<1.0 的兼容要求
+#   - langchain-openai 1.x 需要 openai>=2.x → 必须用 0.3.x
+#   - langchain-mcp-adapters 0.3.x 需要 langchain-core>=1.3 → 必须用 0.1.x
+#   - langgraph 1.x 需要 langchain-core>=1.0 → 必须用 0.2.x
+langgraph>=0.2.60,<0.3
+langchain-core>=0.3.36,<1.0
+langchain-openai>=0.2.14,<0.4
+langchain-mcp-adapters>=0.1.0,<0.2
+openai>=1.104.2,<2.0.0
+
+# FastAPI和相关依赖
+fastapi>=0.115.0
+uvicorn[standard]>=0.32.0
+pydantic>=2.0.0
+pydantic-settings>=2.0.0
+
+# HTTP客户端
+httpx>=0.27.0
+aiohttp>=3.10.0
+
+# 环境变量管理
+python-dotenv>=1.0.0
+
+# CORS支持
+python-multipart>=0.0.9
+
+# 日志
+loguru>=0.7.0
+
+# MCP相关
+fastmcp>=2.0.0
+uv>=0.8.0
+
+# 其他工具
+python-dateutil>=2.8.2
+huggingface_hub>=0.25.0

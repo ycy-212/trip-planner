@@ -1,0 +1,16 @@
+# Docker 构建上下文排除清单（避免大目录/敏感文件进入镜像）
+.git
+.claude
+
+# 前端：本地依赖与产物（镜像内重新安装构建）
+frontend/node_modules
+frontend/dist
+
+# 后端：本地虚拟环境与缓存（镜像内用 pip 重装）
+backend/venv
+**/__pycache__
+*.pyc
+
+# 本地临时覆盖文件（镜像内由 Dockerfile 生成）
+frontend/.env.local
+frontend/.env.*.local

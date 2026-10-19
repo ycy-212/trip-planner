@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(venv/Scripts/python.exe --version)",
+      "Bash(/c/Users/yinch/Desktop/helloagents-trip-planner/.venv/Scripts/python.exe --version)",
+      "Bash(venv/Scripts/python.exe -m pip list)"
+    ]
+  }
+}
